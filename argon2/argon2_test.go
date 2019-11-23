@@ -212,7 +212,7 @@ func TestDefaultFunction(t *testing.T) {
 	if err != nil {
 		t.Fatalf(`Hash("") error %v`, err)
 	}
-	if wantPrefix := []byte("$argon2id$"); !bytes.HasPrefix(got, wantPrefix) {
+	if wantPrefix := []byte("$argon2i$"); !bytes.HasPrefix(got, wantPrefix) {
 		t.Errorf("Hash() uses incorrect mode; got %q; want with prefix %q", got, wantPrefix)
 	}
 }

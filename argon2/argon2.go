@@ -142,9 +142,11 @@ func encode64(buf []byte) []byte {
 	return out
 }
 
-// Hash hashes the password with the default Config for IDKey (Argon2id).
+// Hash hashes the password with the default Config for Key (Argon2i). According
+// to x/crypto/argon2 docs, argon2i is the preferred method for password
+// hashing.
 func Hash(password []byte) ([]byte, error) {
-	return IDKey.Config().Hash(password)
+	return Key.Config().Hash(password)
 }
 
 // Compare hashes password and returns true i.f.f. it results in hash.
