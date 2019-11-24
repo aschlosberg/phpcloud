@@ -30,6 +30,8 @@ class ClientTest extends TestCase {
 
     const STRONG_HASH_PREFIX = '$argon2i$';
 
+    const REFERENCE_IMPL_HASH = '$argon2i$v=19$m=65536,t=2,p=4$c29tZXNhbHQ$RdescudvJCsgt3ub+b+dWRWJTmaaJObG';
+
     /** @var Client */
     private $client;
 
@@ -48,6 +50,8 @@ class ClientTest extends TestCase {
             new CheckPasswordTest("incorrect password", $hash, self::BAD_PASSWORD, false, 0),
             new CheckPasswordTest("correct password for weak hash", $bcrypt, self::PASSWORD, true, 1),
             new CheckPasswordTest("incorrect password for weak hash", $bcrypt, self::BAD_PASSWORD, false, 0),
+            new CheckPasswordTest("reference-implementation example correct password", self::REFERENCE_IMPL_HASH, self::PASSWORD, true, 0),
+            new CheckPasswordTest("reference-implementation example incorrect password", self::REFERENCE_IMPL_HASH, self::BAD_PASSWORD, false, 0),
         ];
 
         foreach ($cases as $case) {
