@@ -19,13 +19,13 @@ func TestReferenceCases(t *testing.T) {
 	// compile.
 	var version interface{}
 	const (
-		Argon2I  = Key
-		Argon2ID = IDKey
+		Argon2I  = I
+		Argon2ID = ID
 	)
 
-	hashtest := func(_ interface{}, tm, m uint32, p uint8, password, salt, hex, prefix, hash string, fn Function) {
+	hashtest := func(_ interface{}, tm, m uint32, p uint8, password, salt, hex, prefix, hash string, mode Mode) {
 		t.Run(`hashtest`, func(t *testing.T) {
-			conf := fn.Config()
+			conf := mode.Config()
 			conf.Time = tm
 			conf.Memory = 1 << m
 			conf.Threads = p
@@ -232,7 +232,7 @@ func TestSaltLen(t *testing.T) {
 }
 
 func TestHashFuzz(t *testing.T) {
-	for _, fn := range []Function{IDKey, Key} {
+	for _, fn := range []Mode{ID, I} {
 		t.Run(string(fn), func(t *testing.T) {
 
 			for _, password := range [][]byte{[]byte("foo"), []byte("bar"), []byte("password"), []byte(`*#LSKD^#)LKSUF*(SKelkf283`)} {
@@ -323,15 +323,15 @@ func TestInvalidConfig(t *testing.T) {
 	t.Run("user-instantiated", func(t *testing.T) {
 		c := new(Config)
 		_, err := c.Hash(nil)
-		if want := ErrInvalidFunction; !errors.Is(err, want) {
+		if want := ErrInvalidMode; !errors.Is(err, want) {
 			t.Errorf("user-instantiated *Config, Hash(nil) got err %v; want %v", err, want)
 		}
 	})
 
 	t.Run("unsupported function", func(t *testing.T) {
-		const fn = Function("argon2d")
-		if got := fn.Config(); got != nil {
-			t.Errorf(`Function(%s).Config() got %+v; want nil`, fn, got)
+		const mode = Mode("argon2d")
+		if got := mode.Config(); got != nil {
+			t.Errorf(`Function(%s).Config() got %+v; want nil`, mode, got)
 		}
 	})
 }

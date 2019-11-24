@@ -22,30 +22,30 @@ const (
 	SaltLen = 16
 )
 
-// A Function corresponds to a crypto/argon2 function.
-type Function string
+// A Mode corresponds to an Argon2 Mode.
+type Mode string
 
-// Supported crypto/argon2 functions.
+// Supported Argon2 Modes.
 const (
-	IDKey Function = "argon2id"
-	Key   Function = "argon2i"
+	ID Mode = "argon2id"
+	I  Mode = "argon2i"
 )
 
-// Config returns a default Config for the Function, as recommended in the
+// Config returns a default Config for the Mode, as recommended in the
 // crypto/argon2 documentation.
-func (f Function) Config() *Config {
-	switch f {
-	case IDKey:
+func (m Mode) Config() *Config {
+	switch m {
+	case ID:
 		return &Config{
-			fn:      IDKey,
+			mode:    ID,
 			Time:    1,
 			Memory:  64 * 1024,
 			Threads: 4,
 			HashLen: 32,
 		}
-	case Key:
+	case I:
 		return &Config{
-			fn:      Key,
+			mode:    I,
 			Time:    3,
 			Memory:  32 * 1024,
 			Threads: 4,
@@ -59,7 +59,7 @@ func (f Function) Config() *Config {
 // instantiate Config directly—rather use Function.Config() as it provides
 // secure-by-default values.
 type Config struct {
-	fn Function
+	mode Mode
 
 	Time, Memory uint32
 	Threads      uint8
@@ -73,7 +73,6 @@ type Error int
 // Pre-defined errors.
 const (
 	ErrUnknown Error = iota
-	ErrInvalidFunction
 	ErrInvalidMode
 	ErrInvalidPrefix
 	ErrInvalidVersion
@@ -83,10 +82,8 @@ const (
 
 func (e Error) Error() string {
 	switch e {
-	case ErrInvalidFunction:
-		return `invalid crypto/argon2 function`
 	case ErrInvalidMode:
-		return fmt.Sprintf(`invalid Argon2 mode; must be %s or %s`, IDKey, Key)
+		return fmt.Sprintf(`invalid Argon2 mode; must be %s or %s`, ID, I)
 	case ErrInvalidPrefix:
 		return `hash with invalid prefix`
 	case ErrInvalidVersion:
@@ -101,7 +98,7 @@ func (e Error) Error() string {
 
 // prefix returns the Config as a prefix string for the final hash.
 func (c *Config) prefix() string {
-	return fmt.Sprintf(`$%s$v=%d$m=%d,t=%d,p=%d$`, c.fn, Version, c.Memory, c.Time, c.Threads)
+	return fmt.Sprintf(`$%s$v=%d$m=%d,t=%d,p=%d$`, c.mode, Version, c.Memory, c.Time, c.Threads)
 }
 
 // Hash returns a hashed password using the Config and a salt generated from
@@ -117,13 +114,13 @@ func (c *Config) Hash(password []byte) ([]byte, error) {
 // hashWithSalt returns a hashed password using the Config and a specified salt.
 func (c *Config) hashWithSalt(password, salt []byte) ([]byte, error) {
 	fn := argon2.IDKey
-	switch c.fn {
-	case IDKey:
+	switch c.mode {
+	case ID:
 		fn = argon2.IDKey
-	case Key:
+	case I:
 		fn = argon2.Key
 	default:
-		return nil, ErrInvalidFunction
+		return nil, ErrInvalidMode
 	}
 
 	var b bytes.Buffer
@@ -142,11 +139,10 @@ func encode64(buf []byte) []byte {
 	return out
 }
 
-// Hash hashes the password with the default Config for Key (Argon2i). According
-// to x/crypto/argon2 docs, argon2i is the preferred method for password
-// hashing.
+// Hash hashes the password with the default Config for argon2i. According to
+// x/crypto/argon2 docs, argon2i is the preferred method for password hashing.
 func Hash(password []byte) ([]byte, error) {
-	return Key.Config().Hash(password)
+	return I.Config().Hash(password)
 }
 
 // Compare hashes password and returns true i.f.f. it results in hash.
@@ -180,8 +176,8 @@ func parse(hash []byte) (*Config, []byte, error) {
 		return nil, nil, ErrInvalidPrefix
 	}
 
-	fn := Function(parts[1])
-	if fn != IDKey && fn != Key {
+	mode := Mode(parts[1])
+	if mode != ID && mode != I {
 		return nil, nil, ErrInvalidMode
 	}
 
@@ -210,7 +206,7 @@ func parse(hash []byte) (*Config, []byte, error) {
 	base64.RawStdEncoding.Decode(salt, parts[4])
 
 	return &Config{
-		fn:      fn,
+		mode:    mode,
 		Memory:  uint32(conf["m"]),
 		Time:    uint32(conf["t"]),
 		Threads: uint8(conf["p"]),

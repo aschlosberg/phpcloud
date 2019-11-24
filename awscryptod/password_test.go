@@ -84,7 +84,7 @@ func TestPasswordUpdate(t *testing.T) {
 
 	// argon2i is, according to x/crypto/argon2 docs, the preferred method for
 	// password hashing. Therefore we update any argon2id hashes.
-	conf := argon2.IDKey.Config()
+	conf := argon2.ID.Config()
 	argon2idHash, err := conf.Hash(password)
 	if err != nil {
 		t.Fatalf("argon2.Config(%+v).Hash(%q) error %v", conf, password, err)
