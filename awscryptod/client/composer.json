@@ -1,0 +1,8 @@
+{
+    "require": {
+        "spiral/goridge": "^2.1"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^8"
+    }
+}
