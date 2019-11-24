@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/aschlosberg/myaspire/argon2"
-	pb "github.com/aschlosberg/myaspire/awscryptod/proto"
-	"github.com/golang/protobuf/proto"
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,9 +16,9 @@ func TestPassword(t *testing.T) {
 	defer cleanup()
 
 	password := []byte("password")
-	hashReq := &pb.HashPasswordRequest{Password: password}
+	hashReq := HashPasswordRequest{Password: password}
 
-	hash, err := cl.HashPassword(ctx, hashReq)
+	hash, err := cl.HashPassword(hashReq)
 	if err != nil {
 		t.Fatalf("HashPassword(%+v) error %v", hashReq, err)
 	}
@@ -30,26 +29,26 @@ func TestPassword(t *testing.T) {
 	tests := []struct {
 		name     string
 		password []byte
-		want     *pb.CheckPasswordResponse
+		want     *CheckPasswordResponse
 	}{
 		{
 			name:     "correct password",
 			password: password,
-			want: &pb.CheckPasswordResponse{
+			want: &CheckPasswordResponse{
 				Match: true,
 			},
 		},
 		{
 			name:     "nil password",
 			password: nil,
-			want: &pb.CheckPasswordResponse{
+			want: &CheckPasswordResponse{
 				Match: false,
 			},
 		},
 		{
 			name:     "different password",
 			password: []byte("incorrect password"),
-			want: &pb.CheckPasswordResponse{
+			want: &CheckPasswordResponse{
 				Match: false,
 			},
 		},
@@ -57,17 +56,17 @@ func TestPassword(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checkReq := &pb.CheckPasswordRequest{
+			checkReq := CheckPasswordRequest{
 				Password: tt.password,
 				Hash:     hash.Hash,
 			}
 
-			got, err := cl.CheckPassword(ctx, checkReq)
+			got, err := cl.CheckPassword(checkReq)
 			if err != nil {
 				t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
 			}
-			if !proto.Equal(got, tt.want) {
-				t.Errorf("CheckPassword(%+v) got %+v; want %+v", checkReq, got, tt.want)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
 			}
 		})
 	}
@@ -128,46 +127,46 @@ func TestPasswordUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checkReq := &pb.CheckPasswordRequest{
+			checkReq := CheckPasswordRequest{
 				Password: password,
 				Hash:     tt.hash,
 			}
 
-			got, err := cl.CheckPassword(ctx, checkReq)
+			got, err := cl.CheckPassword(checkReq)
 			if err != nil {
 				t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
 			}
-			if !got.Match || !got.Update || !bytes.HasPrefix(got.Updated, []byte(`$argon2i$`)) {
+			if !got.Match || !got.Update || !bytes.HasPrefix(got.UpdatedHash, []byte(`$argon2i$`)) {
 				t.Errorf("CheckPassword(%+v) got %+v; want match==true && update==true and updated hash with argon2i", checkReq, got)
 			}
 
 			t.Run("updated hash", func(t *testing.T) {
-				checkReq := &pb.CheckPasswordRequest{
+				checkReq := CheckPasswordRequest{
 					Password: password,
-					Hash:     got.Updated,
+					Hash:     got.UpdatedHash,
 				}
-				got, err = cl.CheckPassword(ctx, checkReq)
+				got, err = cl.CheckPassword(checkReq)
 				if err != nil {
 					t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
 				}
-				want := &pb.CheckPasswordResponse{Match: true}
-				if !proto.Equal(got, want) {
-					t.Errorf("CheckPassword(%+v) got %+v; want %+v", checkReq, got, want)
+				want := &CheckPasswordResponse{Match: true}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
 				}
 			})
 
 			t.Run("no update on mismatch", func(t *testing.T) {
-				checkReq := &pb.CheckPasswordRequest{
+				checkReq := CheckPasswordRequest{
 					Password: incorrect,
 					Hash:     tt.hash,
 				}
-				got, err = cl.CheckPassword(ctx, checkReq)
+				got, err = cl.CheckPassword(checkReq)
 				if err != nil {
 					t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
 				}
-				want := &pb.CheckPasswordResponse{Match: false, Update: false}
-				if !proto.Equal(got, want) {
-					t.Errorf("CheckPassword(%+v) got %+v; want %+v", checkReq, got, want)
+				want := &CheckPasswordResponse{Match: false, Update: false}
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
 				}
 			})
 		})

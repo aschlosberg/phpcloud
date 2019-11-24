@@ -7,13 +7,13 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/rpc"
 	"os"
 	"os/signal"
 	"syscall"
 
-	pb "github.com/aschlosberg/myaspire/awscryptod/proto"
 	log "github.com/golang/glog"
-	"google.golang.org/grpc"
+	"github.com/spiral/goridge"
 )
 
 func main() {
@@ -25,45 +25,60 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sig
-		log.Info("Shutting down gracefully")
+		log.Infof("Shutting down on signal: %s", <-sig)
 		cancel()
 	}()
 
-	if err := listen(ctx, *sock); err != nil {
+	if err := serve(ctx, *sock, nil); err != nil {
 		log.Exit(err)
 	}
 }
 
-func listen(ctx context.Context, sock string) error {
+// serve listens on sock, closing ready (if non-nil) once listening, and then
+// accepts net/rpc connections with the goridge Codec.
+func serve(ctx context.Context, sock string, ready chan struct{}) error {
 	lis, err := net.Listen("unix", sock)
 	if err != nil {
 		return fmt.Errorf("listen on socket: %v", err)
 	}
+	if ready != nil {
+		close(ready)
+	}
 	log.Infof("Listening on socket %q", sock)
 
-	srv := server()
+	rpc.Register(new(Crypto))
 
 	done := make(chan struct{})
 	go func() {
 		<-ctx.Done()
-		srv.GracefulStop()
 		lis.Close()
 		close(done)
 	}()
 
-	if err := srv.Serve(lis); err != nil {
-		return fmt.Errorf("gRPC serve: %v", err)
+AcceptLoop:
+	for {
+		conn, err := lis.Accept()
+
+		// It's not possible to use errors.Is() to determine if err is because
+		// of a closed connection, but this will be because the context was
+		// cancelled.
+		// https://github.com/golang/go/issues/4373
+		select {
+		case <-ctx.Done():
+			break AcceptLoop
+		default:
+		}
+
+		if err != nil {
+			log.Warningf("Ignoring net.Listener.Accept() error: %T %v", err, err)
+			continue
+		}
+		go rpc.ServeCodec(goridge.NewCodec(conn))
 	}
+
 	<-done
 	return nil
 }
 
-func server() *grpc.Server {
-	srv := grpc.NewServer()
-	svc := new(service)
-	pb.RegisterAWSCryptoServiceServer(srv, svc)
-	return srv
-}
-
-type service struct{}
+// Crypto implements a net/rpc service.
+type Crypto struct{}

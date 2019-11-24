@@ -2,25 +2,32 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
+	"fmt"
 
 	"github.com/aschlosberg/myaspire/argon2"
-	pb "github.com/aschlosberg/myaspire/awscryptod/proto"
 	log "github.com/golang/glog"
 	"golang.org/x/crypto/bcrypt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
-func (s *service) HashPassword(ctx context.Context, req *pb.HashPasswordRequest) (*pb.HashPasswordResponse, error) {
+// HashPasswordRequest is the request argument for Crypto.HashPassword.
+type HashPasswordRequest struct {
+	Password []byte
+}
+
+// HashPasswordResponse is the response argument for Crypto.HashPassword.
+type HashPasswordResponse struct {
+	Hash []byte
+}
+
+// HashPassword returns req.Password, hashed with Argon2i.
+func (c *Crypto) HashPassword(req HashPasswordRequest, resp *HashPasswordResponse) error {
 	hash, err := argon2.Hash(req.Password)
 	if err != nil {
-		return nil, status.Errorf(codes.Unknown, "hashing password: %v", err)
+		return fmt.Errorf("hashing password: %v", err)
 	}
-	return &pb.HashPasswordResponse{
-		Hash: hash,
-	}, nil
+	resp.Hash = hash
+	return nil
 }
 
 var (
@@ -32,7 +39,27 @@ var (
 	argon2i  = []byte(`$argon2i$`)
 )
 
-func (s *service) CheckPassword(ctx context.Context, req *pb.CheckPasswordRequest) (*pb.CheckPasswordResponse, error) {
+// CheckPasswordRequest is the request argument for Crypto.CheckPassword.
+type CheckPasswordRequest struct {
+	Password, Hash []byte
+}
+
+// CheckPasswordResponse is the response argument for Crypto.CheckPassword.
+type CheckPasswordResponse struct {
+	Match bool
+
+	// If `Update==true`, the stored hash should be changed to `UpdatedHash` for
+	// improved security.
+	Update      bool
+	UpdatedHash []byte
+
+	DebugReason string
+}
+
+// CheckPassword confirms that the password matches the hash. It supports both
+// bcrypt and Argon2. If the password matches, and the hash is anything other
+// than argon2i, an updated hash is returned by internally calling HashPassword.
+func (c *Crypto) CheckPassword(req CheckPasswordRequest, resp *CheckPasswordResponse) error {
 	var match, updateIfMatch bool
 	var reason string
 
@@ -58,21 +85,23 @@ func (s *service) CheckPassword(ctx context.Context, req *pb.CheckPasswordReques
 		}
 	}
 
-	resp := &pb.CheckPasswordResponse{
+	*resp = CheckPasswordResponse{
 		Match:       match,
 		DebugReason: reason,
 		Update:      match && updateIfMatch,
 	}
-	if resp.Update {
-		updated, err := s.HashPassword(ctx, &pb.HashPasswordRequest{Password: req.Password})
-		// We shouldn't block a user from logging in merely because we couldn't
-		// update the hash.
-		if err != nil {
-			log.Errorf("Update password: %v", err)
-			resp.DebugReason = err.Error()
-		} else {
-			resp.Updated = updated.Hash
-		}
+	if !resp.Update {
+		return nil
 	}
-	return resp, nil
+
+	updated := new(HashPasswordResponse)
+	if err := c.HashPassword(HashPasswordRequest{Password: req.Password}, updated); err != nil {
+		// We shouldn't block a user from logging in merely because we
+		// couldn't update the hash.
+		log.Errorf("Update password: %v", err)
+		resp.DebugReason = err.Error()
+	} else {
+		resp.UpdatedHash = updated.Hash
+	}
+	return nil
 }
