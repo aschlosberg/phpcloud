@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"net/rpc"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 
 func main() {
 	sock := flag.String("socket", "/tmp/phpcloud.sock", "Unix socket on which to listen.")
+	healthPort := flag.Int("health_port", 1810, "Port on which to start an HTTP server responding to health checks.")
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -34,7 +36,13 @@ func main() {
 		log.Exitf("Register RPC services: %v", err)
 	}
 
-	if err := serve(ctx, *sock, nil); err != nil {
+	ready := make(chan struct{})
+	go func() {
+		<-ready
+		serveHealthCheck(fmt.Sprintf("127.0.0.1:%d", *healthPort))
+	}()
+
+	if err := serve(ctx, *sock, ready); err != nil {
 		log.Exit(err)
 	}
 }
@@ -113,4 +121,14 @@ AcceptLoop:
 
 	<-done
 	return nil
+}
+
+func serveHealthCheck(addr string) {
+	const path = "/health"
+	log.Infof("Starting health server on http://%s%s", addr, path)
+
+	http.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte("Ok"))
+	})
+	http.ListenAndServe(addr, nil)
 }

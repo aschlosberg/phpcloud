@@ -8,3 +8,6 @@ curl --silent http://phpcloud:8080/fpm-ping \
 
 curl --silent http://phpcloud:8080 \
     | tee /dev/stderr | grep -E '^Tests pass$' >/dev/null
+
+curl --silent http://phpcloud:8080/phpcloud-health \
+    | tee /dev/stderr | grep -E '^Ok$' >/dev/null
