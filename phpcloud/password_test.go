@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aschlosberg/myaspire/argon2"
@@ -15,20 +16,20 @@ func TestPassword(t *testing.T) {
 	cl, cleanup := client(ctx, t)
 	defer cleanup()
 
-	password := []byte("password")
+	const password = "password"
 	hashReq := HashPasswordRequest{Password: password}
 
 	hash, err := cl.HashPassword(hashReq)
 	if err != nil {
 		t.Fatalf("HashPassword(%+v) error %v", hashReq, err)
 	}
-	if got := hash.Hash; !bytes.HasPrefix(got, []byte(`$argon2i$`)) {
+	if got := hash.Hash; !strings.HasPrefix(got, `$argon2i$`) {
 		t.Fatalf("HashPassowrd(%+v) got %q; want generated with argon2i", hashReq, got)
 	}
 
 	tests := []struct {
 		name     string
-		password []byte
+		password string
 		want     *CheckPasswordResponse
 	}{
 		{
@@ -39,15 +40,15 @@ func TestPassword(t *testing.T) {
 			},
 		},
 		{
-			name:     "nil password",
-			password: nil,
+			name:     "empty password",
+			password: "",
 			want: &CheckPasswordResponse{
 				Match: false,
 			},
 		},
 		{
 			name:     "different password",
-			password: []byte("incorrect password"),
+			password: "incorrect password",
 			want: &CheckPasswordResponse{
 				Match: false,
 			},
@@ -73,10 +74,12 @@ func TestPassword(t *testing.T) {
 }
 
 func TestPasswordUpdate(t *testing.T) {
-	password := []byte("password")
-	incorrect := []byte("wrong password")
+	const (
+		password  = "password"
+		incorrect = "wrong password"
+	)
 
-	bcryptHash, err := bcrypt.GenerateFromPassword(password, 3)
+	bcryptHash, err := bcrypt.GenerateFromPassword([]byte(password), 3)
 	if err != nil {
 		t.Fatalf("bcrypt.GenerateFromPassword(%q) error %v", password, err)
 	}
@@ -84,7 +87,7 @@ func TestPasswordUpdate(t *testing.T) {
 	// argon2i is, according to x/crypto/argon2 docs, the preferred method for
 	// password hashing. Therefore we update any argon2id hashes.
 	conf := argon2.ID.Config()
-	argon2idHash, err := conf.Hash(password)
+	argon2idHash, err := conf.Hash([]byte(password))
 	if err != nil {
 		t.Fatalf("argon2.Config(%+v).Hash(%q) error %v", conf, password, err)
 	}
@@ -129,14 +132,14 @@ func TestPasswordUpdate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			checkReq := CheckPasswordRequest{
 				Password: password,
-				Hash:     tt.hash,
+				Hash:     string(tt.hash),
 			}
 
 			got, err := cl.CheckPassword(checkReq)
 			if err != nil {
 				t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
 			}
-			if !got.Match || !got.Update || !bytes.HasPrefix(got.UpdatedHash, []byte(`$argon2i$`)) {
+			if !got.Match || !got.Update || !strings.HasPrefix(got.UpdatedHash, `$argon2i$`) {
 				t.Errorf("CheckPassword(%+v) got %+v; want match==true && update==true and updated hash with argon2i", checkReq, got)
 			}
 
@@ -158,7 +161,7 @@ func TestPasswordUpdate(t *testing.T) {
 			t.Run("no update on mismatch", func(t *testing.T) {
 				checkReq := CheckPasswordRequest{
 					Password: incorrect,
-					Hash:     tt.hash,
+					Hash:     string(tt.hash),
 				}
 				got, err = cl.CheckPassword(checkReq)
 				if err != nil {

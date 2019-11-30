@@ -49,9 +49,9 @@ class Client {
      * @return string The hashed password.
      */
     public function HashPassword(string $password) : string {
-        $req = array("Password" => base64_encode($password));
+        $req = array("Password" => $password);
         $resp = $this->rpc->call("Crypto.HashPassword", $req);
-        return base64_decode($resp['Hash']);
+        return $resp['Hash'];
     }
 
     /**
@@ -72,13 +72,13 @@ class Client {
      */
     public function CheckPassword(string $hash, string $password, $update_cb) : bool {
         $req = array(
-            "Hash" => base64_encode($hash),
-            "Password" => base64_encode($password),
+            "Hash" => $hash,
+            "Password" => $password,
         );
         $resp = $this->rpc->call("Crypto.CheckPassword", $req);
         
         if ($resp['Update']) {
-            $update_cb(base64_decode($resp['UpdatedHash']));
+            $update_cb($resp['UpdatedHash']);
         }
         return $resp['Match'];
     }

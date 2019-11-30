@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aschlosberg/myaspire/argon2"
 	log "github.com/golang/glog"
@@ -12,36 +12,36 @@ import (
 
 // HashPasswordRequest is the request argument for Crypto.HashPassword.
 type HashPasswordRequest struct {
-	Password []byte
+	Password string
 }
 
 // HashPasswordResponse is the response argument for Crypto.HashPassword.
 type HashPasswordResponse struct {
-	Hash []byte
+	Hash string
 }
 
 // HashPassword returns req.Password, hashed with Argon2i.
 func (c *Crypto) HashPassword(req HashPasswordRequest, resp *HashPasswordResponse) error {
-	hash, err := argon2.Hash(req.Password)
+	hash, err := argon2.Hash([]byte(req.Password))
 	if err != nil {
 		return fmt.Errorf("hashing password: %v", err)
 	}
-	resp.Hash = hash
+	resp.Hash = string(hash)
 	return nil
 }
 
-var (
-	bcryptA  = []byte(`$2a$`)
-	bcryptB  = []byte(`$2b$`)
-	bcryptX  = []byte(`$2x$`)
-	bcryptY  = []byte(`$2y$`)
-	argon2id = []byte(`$argon2id$`)
-	argon2i  = []byte(`$argon2i$`)
+const (
+	bcryptA  = `$2a$`
+	bcryptB  = `$2b$`
+	bcryptX  = `$2x$`
+	bcryptY  = `$2y$`
+	argon2id = `$argon2id$`
+	argon2i  = `$argon2i$`
 )
 
 // CheckPasswordRequest is the request argument for Crypto.CheckPassword.
 type CheckPasswordRequest struct {
-	Password, Hash []byte
+	Password, Hash string
 }
 
 // CheckPasswordResponse is the response argument for Crypto.CheckPassword.
@@ -51,7 +51,7 @@ type CheckPasswordResponse struct {
 	// If `Update==true`, the stored hash should be changed to `UpdatedHash` for
 	// improved security.
 	Update      bool
-	UpdatedHash []byte
+	UpdatedHash string
 
 	DebugReason string
 }
@@ -64,21 +64,21 @@ func (c *Crypto) CheckPassword(req CheckPasswordRequest, resp *CheckPasswordResp
 	var reason string
 
 	switch {
-	case bytes.HasPrefix(req.Hash, bcryptA):
+	case strings.HasPrefix(req.Hash, bcryptA):
 		fallthrough
-	case bytes.HasPrefix(req.Hash, bcryptB):
+	case strings.HasPrefix(req.Hash, bcryptB):
 		fallthrough
-	case bytes.HasPrefix(req.Hash, bcryptX):
+	case strings.HasPrefix(req.Hash, bcryptX):
 		fallthrough
-	case bytes.HasPrefix(req.Hash, bcryptY):
-		match = bcrypt.CompareHashAndPassword(req.Hash, req.Password) == nil
+	case strings.HasPrefix(req.Hash, bcryptY):
+		match = bcrypt.CompareHashAndPassword([]byte(req.Hash), []byte(req.Password)) == nil
 		updateIfMatch = true
-	case bytes.HasPrefix(req.Hash, argon2id):
+	case strings.HasPrefix(req.Hash, argon2id):
 		updateIfMatch = true
 		fallthrough
-	case bytes.HasPrefix(req.Hash, argon2i):
+	case strings.HasPrefix(req.Hash, argon2i):
 		var err error
-		match, err = argon2.Compare(req.Hash, req.Password)
+		match, err = argon2.Compare([]byte(req.Hash), []byte(req.Password))
 		var e argon2.Error
 		if errors.As(err, &e) {
 			reason = err.Error()
