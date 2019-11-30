@@ -6,7 +6,7 @@ go_library(
         "password.go",
         "phpcloud.go",
     ],
-    importpath = "github.com/aschlosberg/myaspire/phpcloud",
+    importpath = "github.com/aschlosberg/phpcloud/phpcloud",
     visibility = ["//visibility:private"],
     deps = [
         "//argon2:go_default_library",

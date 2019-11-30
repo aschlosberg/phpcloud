@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aschlosberg/myaspire/argon2"
+	"github.com/aschlosberg/phpcloud/argon2"
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/crypto/bcrypt"
 )

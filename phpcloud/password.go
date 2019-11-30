@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aschlosberg/myaspire/argon2"
+	"github.com/aschlosberg/phpcloud/argon2"
 	log "github.com/golang/glog"
 	"golang.org/x/crypto/bcrypt"
 )
