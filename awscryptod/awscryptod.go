@@ -1,5 +1,4 @@
-// The awscryptod binary is a daemon that provides the AWSCryptoService gRPC
-// service.
+// The awscryptod binary is a daemon that provides a "Crypto" RPC service.
 package main
 
 import (
@@ -41,6 +40,13 @@ func serve(ctx context.Context, sock string, ready chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("listen on socket: %v", err)
 	}
+	if err := os.Chmod(sock, 0770); err != nil {
+		return fmt.Errorf("chmod socket to 770: %v", err)
+	}
+	if err := os.Chown(sock, os.Getuid(), os.Getgid()); err != nil {
+		return fmt.Errorf("chown socket %d:%d: %v", os.Getuid(), os.Getgid(), err)
+	}
+
 	if ready != nil {
 		close(ready)
 	}

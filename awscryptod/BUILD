@@ -20,6 +20,7 @@ go_binary(
     name = "awscryptod",
     embed = [":go_default_library"],
     visibility = ["//visibility:public"],
+    static = "on",
 )
 
 go_test(

@@ -20,6 +20,17 @@ class Client {
     private $rpc;
 
     /**
+     * Instantiate a new Client connected to the default socket.
+     * 
+     * @static
+     * 
+     * @return Client
+     */
+    public static function Default() {
+        return new Client("/run/awscryptod/awscryptod.sock");
+    }
+
+    /**
      * @param string $unix_socket The UNIX socket address on which awscryptod is
      * listening.
      *
