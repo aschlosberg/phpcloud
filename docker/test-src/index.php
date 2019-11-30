@@ -1,13 +1,13 @@
 <?php
 
-use MyAspire\Crypto;
-require "awscryptod/Client.php";
+use PHPCloud\Client;
+require "phpcloud/Client.php";
 
 const PREFIX = '$argon2i$';
 const PASSWORD = "password";
 const BAD_PASSWORD = "incorrect";
 
-$c = Crypto\Client::Default();
+$c = Client::Default();
 $hash = $c->HashPassword(PASSWORD);
 $check_good = $c->CheckPassword($hash, PASSWORD, null);
 $check_bad = $c->CheckPassword($hash, BAD_PASSWORD, null);

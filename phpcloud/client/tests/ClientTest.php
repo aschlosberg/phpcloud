@@ -1,8 +1,8 @@
 <?php
 
-namespace MyAspire\Crypto\Tests;
+namespace PHPCloud\Tests;
 
-use MyAspire\Crypto;
+use PHPCloud\Client;
 use PHPUnit\Framework\TestCase;
 
 class CheckPasswordTest {
@@ -22,7 +22,7 @@ class CheckPasswordTest {
 }
 
 class ClientTest extends TestCase {
-    const UNIX_SOCKET = "/tmp/awscryptod.sock";
+    const UNIX_SOCKET = "/tmp/phpcloud.sock";
 
     const PASSWORD = "password";
 
@@ -36,7 +36,7 @@ class ClientTest extends TestCase {
     private $client;
 
     public function setUp(): void {
-        $this->client = new Crypto\Client(self::UNIX_SOCKET);
+        $this->client = new Client(self::UNIX_SOCKET);
     }
 
     public function testCheckPassword(): void {

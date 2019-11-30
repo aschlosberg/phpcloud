@@ -1,4 +1,5 @@
-// The awscryptod binary is a daemon that provides a "Crypto" RPC service.
+// The phpcloud binary is a daemon that provides a "Crypto" RPC service. It does
+// not daemonise itself, but relies on an external mechanism.
 package main
 
 import (
@@ -16,7 +17,7 @@ import (
 )
 
 func main() {
-	sock := flag.String("socket", "/tmp/awscryptod.sock", "Unix socket on which to listen.")
+	sock := flag.String("socket", "/tmp/phpcloud.sock", "Unix socket on which to listen.")
 	flag.Parse()
 
 	ctx, cancel := context.WithCancel(context.Background())

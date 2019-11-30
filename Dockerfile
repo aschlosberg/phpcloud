@@ -1,6 +1,6 @@
 FROM alpine:3.10
 LABEL Maintainer="Arran Schlosberg (github.com/aschlosberg)" \
-      Description="NGINX+PHP setup with awscryptod."
+      Description="NGINX+PHP setup with phpcloud deaemon."
 
 ##### nginx #####
 
@@ -24,21 +24,21 @@ RUN adduser --system phpuser phpuser
 RUN rm /etc/php7/php-fpm.d/*
 COPY docker/config/fpm-www_pool.conf /etc/php7/php-fpm.d/www.conf
 
-##### awscryptod #####
+##### phpcloud #####
 
-RUN addgroup awscrypto
-RUN adduser --system awscrypto awscrypto
-RUN adduser phpuser awscrypto
+RUN addgroup phpcloud
+RUN adduser --system phpcloud phpcloud
+RUN adduser phpuser phpcloud
 
-COPY docker/bin/awscryptod_amd64 /usr/sbin/awscryptod
-RUN chown awscrypto:awscrypto /usr/sbin/awscryptod
-RUN chmod 500 /usr/sbin/awscryptod
+COPY docker/bin/phpcloud_amd64 /usr/sbin/phpcloud
+RUN chown phpcloud:phpcloud /usr/sbin/phpcloud
+RUN chmod 500 /usr/sbin/phpcloud
 
-COPY docker/config/php.ini /usr/local/etc/php/conf.d/awscryptod.ini
+COPY docker/config/php.ini /usr/local/etc/php/conf.d/phpcloud.ini
 
-COPY awscryptod/client/Client.php awscryptod/client/composer.* /usr/share/php7/awscryptod/
-RUN chown phpuser:phpuser /usr/share/php7/awscryptod
-WORKDIR /usr/share/php7/awscryptod
+COPY phpcloud/client/Client.php phpcloud/client/composer.* /usr/share/php7/phpcloud/
+RUN chown phpuser:phpuser /usr/share/php7/phpcloud
+WORKDIR /usr/share/php7/phpcloud
 USER phpuser
 RUN composer install --no-dev
 USER root
@@ -46,7 +46,7 @@ WORKDIR /
 
 ##### /run/* directories #####
 
-# All should be user-access only, except for awscryptod as it needs group access
+# All should be user-access only, except for phpcloud as it needs group access
 # too.
 RUN mkdir /run/supervisord
 RUN chmod 700 /run/supervisord
@@ -55,9 +55,9 @@ RUN mkdir /run/nginx
 RUN chown nginx:nginx /run/nginx
 RUN chmod 700 /run/nginx
 
-RUN mkdir /run/awscryptod
-RUN chown awscrypto:awscrypto /run/awscryptod
-RUN chmod 750 /run/awscryptod
+RUN mkdir /run/phpcloud
+RUN chown phpcloud:phpcloud /run/phpcloud
+RUN chmod 750 /run/phpcloud
 
 ##### supervisord #####
 

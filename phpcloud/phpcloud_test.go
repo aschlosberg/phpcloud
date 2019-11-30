@@ -42,7 +42,7 @@ func client(ctx context.Context, t *testing.T) (_ *cryptoClient, cleanup func())
 		t.Fatalf("crypto/rand.Read() for random suffix; error %v", err)
 	}
 
-	sock := fmt.Sprintf("/tmp/awscryptod-%s.sock", hex.EncodeToString(suffix))
+	sock := fmt.Sprintf("/tmp/phpcloud-%s.sock", hex.EncodeToString(suffix))
 	ready := make(chan struct{})
 	done := make(chan struct{})
 	go func() {

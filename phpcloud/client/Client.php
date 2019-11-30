@@ -1,19 +1,19 @@
 <?php
 declare(strict_types=1);
 /**
- * The awscryptod daemon handles cryptographic tasks in AWS, allowing multiple
- * PHP requests to reuse resources such as data-encryption keys without having
- * to make individual requests to KMS.
+ * The phpcloud daemon handles cloud-provider tasks, allowing multiple PHP
+ * requests to reuse resources such as data-encryption keys without having to
+ * make individual requests.
  */
 
-namespace MyAspire\Crypto;
+namespace PHPCloud;
 
 use Spiral\Goridge\RPC;
 use Spiral\Goridge\SocketRelay;
 require "vendor/autoload.php";
 
 /**
- * Client for the awscryptod daemon.
+ * Client for the phpcloud daemon.
  */
 class Client {
     /** @var RPC */
@@ -27,11 +27,11 @@ class Client {
      * @return Client
      */
     public static function Default() {
-        return new Client("/run/awscryptod/awscryptod.sock");
+        return new Client("/run/phpcloud/phpcloud.sock");
     }
 
     /**
-     * @param string $unix_socket The UNIX socket address on which awscryptod is
+     * @param string $unix_socket The UNIX socket address on which phpcloud is
      * listening.
      *
      * @return void
