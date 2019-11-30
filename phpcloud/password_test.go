@@ -13,7 +13,7 @@ import (
 
 func TestPassword(t *testing.T) {
 	ctx := context.Background()
-	cl, cleanup := client(ctx, t)
+	cl, cleanup := defaultTestClient(ctx, t)
 	defer cleanup()
 
 	const password = "password"
@@ -21,10 +21,10 @@ func TestPassword(t *testing.T) {
 
 	hash, err := cl.HashPassword(hashReq)
 	if err != nil {
-		t.Fatalf("HashPassword(%+v) error %v", hashReq, err)
+		t.Fatalf("Crypto.HashPassword(%+v) error %v", hashReq, err)
 	}
 	if got := hash.Hash; !strings.HasPrefix(got, `$argon2i$`) {
-		t.Fatalf("HashPassowrd(%+v) got %q; want generated with argon2i", hashReq, got)
+		t.Fatalf("Crypto.HashPassowrd(%+v) got %q; want generated with argon2i", hashReq, got)
 	}
 
 	tests := []struct {
@@ -64,10 +64,10 @@ func TestPassword(t *testing.T) {
 
 			got, err := cl.CheckPassword(checkReq)
 			if err != nil {
-				t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
+				t.Fatalf("Crypto.CheckPassword(%+v) error %v", checkReq, err)
 			}
 			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
+				t.Errorf("Crypto.CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
 			}
 		})
 	}
@@ -96,7 +96,7 @@ func TestPasswordUpdate(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	cl, cleanup := client(ctx, t)
+	cl, cleanup := defaultTestClient(ctx, t)
 	defer cleanup()
 
 	// bcrypt prefix has a variety of values to signal broken/fixed versions. We
@@ -137,10 +137,10 @@ func TestPasswordUpdate(t *testing.T) {
 
 			got, err := cl.CheckPassword(checkReq)
 			if err != nil {
-				t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
+				t.Fatalf("Crypto.CheckPassword(%+v) error %v", checkReq, err)
 			}
 			if !got.Match || !got.Update || !strings.HasPrefix(got.UpdatedHash, `$argon2i$`) {
-				t.Errorf("CheckPassword(%+v) got %+v; want match==true && update==true and updated hash with argon2i", checkReq, got)
+				t.Errorf("Crypto.CheckPassword(%+v) got %+v; want match==true && update==true and updated hash with argon2i", checkReq, got)
 			}
 
 			t.Run("updated hash", func(t *testing.T) {
@@ -150,11 +150,11 @@ func TestPasswordUpdate(t *testing.T) {
 				}
 				got, err = cl.CheckPassword(checkReq)
 				if err != nil {
-					t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
+					t.Fatalf("Crypto.CheckPassword(%+v) error %v", checkReq, err)
 				}
 				want := &CheckPasswordResponse{Match: true}
 				if diff := cmp.Diff(want, got); diff != "" {
-					t.Errorf("CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
+					t.Errorf("Crypto.CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
 				}
 			})
 
@@ -165,11 +165,11 @@ func TestPasswordUpdate(t *testing.T) {
 				}
 				got, err = cl.CheckPassword(checkReq)
 				if err != nil {
-					t.Fatalf("CheckPassword(%+v) error %v", checkReq, err)
+					t.Fatalf("Crypto.CheckPassword(%+v) error %v", checkReq, err)
 				}
 				want := &CheckPasswordResponse{Match: false, Update: false}
 				if diff := cmp.Diff(want, got); diff != "" {
-					t.Errorf("CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
+					t.Errorf("Crypto.CheckPassword(%+v) (-want +got):\n%s", checkReq, diff)
 				}
 			})
 		})

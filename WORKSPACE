@@ -55,3 +55,9 @@ go_repository(
     importpath = "github.com/google/go-cmp",
     commit = "2d0692c2e9617365a95b295612ac0d4415ba4627",
 )
+
+go_repository(
+    name = "com_github_aws_aws_sdk_go",
+    importpath = "github.com/aws/aws-sdk-go",
+    commit = "31767fe4cf2e7e969e2245ab694e21f85015e24b",
+)

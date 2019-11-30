@@ -10,6 +10,7 @@ import (
 	"net/rpc"
 	"os"
 	"os/signal"
+	"reflect"
 	"syscall"
 
 	log "github.com/golang/glog"
@@ -29,9 +30,38 @@ func main() {
 		cancel()
 	}()
 
+	if err := register(new(Crypto), NewAWS(nil)); err != nil {
+		log.Exitf("Register RPC services: %v", err)
+	}
+
 	if err := serve(ctx, *sock, nil); err != nil {
 		log.Exit(err)
 	}
+}
+
+func register(c *Crypto, a *AWS) error {
+	return registerWithPrefix("", c, a)
+}
+
+// registerWithPrefix allows tests to inject uniquely identifiable services. In
+// production, an empty prefix should be used by calling register(), which has
+// the same effective outcome as calling net/rpc.Register() with each of the
+// service implementations.
+//
+// registerWithPrefix calls net/rpc.RegisterName with all of the service
+// implementations, prepending `prefix` to each of their types. For example,
+// with prefix "foo", c will be registered as "fooCrypto".
+func registerWithPrefix(prefix string, c *Crypto, a *AWS) error {
+	for _, rcvr := range []interface{}{c, a} {
+		if reflect.ValueOf(rcvr).IsNil() {
+			continue
+		}
+		name := prefix + reflect.TypeOf(rcvr).Elem().Name()
+		if err := rpc.RegisterName(name, rcvr); err != nil {
+			return fmt.Errorf("register receiver %q: %v", name, err)
+		}
+	}
+	return nil
 }
 
 // serve listens on sock, closing ready (if non-nil) once listening, and then
@@ -53,13 +83,11 @@ func serve(ctx context.Context, sock string, ready chan struct{}) error {
 	}
 	log.Infof("Listening on socket %q", sock)
 
-	rpc.Register(new(Crypto))
-
 	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		<-ctx.Done()
 		lis.Close()
-		close(done)
 	}()
 
 AcceptLoop:
@@ -86,6 +114,3 @@ AcceptLoop:
 	<-done
 	return nil
 }
-
-// Crypto implements a net/rpc service.
-type Crypto struct{}
