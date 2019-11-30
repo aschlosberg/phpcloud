@@ -13,7 +13,7 @@ $check_good = $c->CheckPassword($hash, PASSWORD, null);
 $check_bad = $c->CheckPassword($hash, BAD_PASSWORD, null);
 
 if (substr($hash, 0, strlen(PREFIX))==PREFIX && $check_good && !$check_bad) {
-    echo "OK";
+    echo "Tests pass\n";
 } else {
     $pw = PASSWORD;
     $bad = BAD_PASSWORD;

@@ -1,0 +1,15 @@
+version: '3'
+services:
+  phpcloud:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - "./docker/test-src:/var/www/public:ro"
+  sut:
+    image: alpine:3.10
+    depends_on:
+      - phpcloud
+    command: /tmp/docker_tests.sh
+    volumes:
+      - "./docker_tests.sh:/tmp/docker_tests.sh:ro"
