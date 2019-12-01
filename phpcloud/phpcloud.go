@@ -32,7 +32,7 @@ func main() {
 		cancel()
 	}()
 
-	if err := register(new(Crypto), NewAWS(nil)); err != nil {
+	if err := register(NewCrypto(), NewAWS(nil)); err != nil {
 		log.Exitf("Register RPC services: %v", err)
 	}
 
@@ -131,4 +131,33 @@ func serveHealthCheck(addr string) {
 		w.Write([]byte("Ok"))
 	})
 	http.ListenAndServe(addr, nil)
+}
+
+// Error implements the error interface.
+type Error int
+
+// Pre-defined errors.
+const (
+	ErrUnknown Error = iota
+	ErrUnimplemented
+	ErrKeyTypeUnsupported
+	ErrKeyBase64
+	ErrNotDecrypted
+	ErrBlockModeUnsupported
+)
+
+func (e Error) Error() string {
+	switch e {
+	case ErrUnimplemented:
+		return "unimplemented"
+	case ErrKeyTypeUnsupported:
+		return "crypto key-source type not supported"
+	case ErrKeyBase64:
+		return "invalid base64-encoded data"
+	case ErrNotDecrypted:
+		return "unable to decrypt"
+	case ErrBlockModeUnsupported:
+		return "crypto block mode not supported"
+	}
+	return "unknown error"
 }

@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"encoding/hex"
 	"fmt"
+	mathrand "math/rand"
 	"net"
 	"net/rpc"
 	"testing"
@@ -49,10 +50,26 @@ func (c *rpcClient) Secret(req SecretRequest) (*SecretResponse, error) {
 	return resp, nil
 }
 
+func (c *rpcClient) EncryptAESGCM(req EncryptRequest) (*EncryptResponse, error) {
+	resp := new(EncryptResponse)
+	if err := c.Call(`Crypto.EncryptAESGCM`, req, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *rpcClient) Decrypt(req DecryptRequest) (*DecryptResponse, error) {
+	resp := new(DecryptResponse)
+	if err := c.Call(`Crypto.Decrypt`, req, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 // defaultTestClient is equivalent to testClient with zero values for service
 // implementations.
 func defaultTestClient(ctx context.Context, t *testing.T) (_ *rpcClient, cleanup func()) {
-	return testClient(ctx, t, new(Crypto), new(AWS))
+	return testClient(ctx, t, NewCrypto(), NewAWS(nil))
 }
 
 // testClient returns an rpcClient connected to a new socket, created by
@@ -60,11 +77,7 @@ func defaultTestClient(ctx context.Context, t *testing.T) (_ *rpcClient, cleanup
 func testClient(ctx context.Context, t *testing.T, c *Crypto, a *AWS) (_ *rpcClient, cleanup func()) {
 	ctx, cancel := context.WithCancel(ctx)
 
-	buf := make([]byte, 8)
-	if _, err := rand.Read(buf); err != nil {
-		t.Fatalf("crypto/rand.Read() for unique ID; error %v", err)
-	}
-	uniq := hex.EncodeToString(buf)
+	uniq := hex.EncodeToString(cryptoRandBytes(t, 8, "generate unique identifier for test client"))
 	t.Logf("Unique identifier for sockets and RPC services: %s", uniq)
 
 	if err := registerWithPrefix(uniq, c, a); err != nil {
@@ -96,4 +109,18 @@ func testClient(ctx context.Context, t *testing.T, c *Crypto, a *AWS) (_ *rpcCli
 		cancel()
 		<-done
 	}
+}
+
+func cryptoRandBytes(t *testing.T, n int, desc string) []byte {
+	buf := make([]byte, n)
+	if _, err := cryptorand.Read(buf); err != nil {
+		t.Errorf("%s: crypto/rand.Read(%d) error %v", desc, n, err)
+	}
+	return buf
+}
+
+func mathRandBytes(n int) []byte {
+	buf := make([]byte, n)
+	mathrand.Read(buf)
+	return buf
 }

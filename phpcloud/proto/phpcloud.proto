@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+message Ciphertext {
+    enum Mode {
+        UnknownMode = 0;
+        AESGCM = 1;
+
+        // This will never be used for encryption, but we may receive ciphertext
+        // from sources such as MariaDB's AES_ENCRYPT().
+        AESECB = 2;
+    }
+
+    Mode mode = 1;
+    bytes nonce = 2;
+    bytes sealed = 3;
+    bytes authenticated_data = 4;
+}
