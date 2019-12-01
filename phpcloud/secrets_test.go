@@ -137,7 +137,9 @@ func TestSecretErrors(t *testing.T) {
 	ctx := context.Background()
 
 	stub := newSecretStub(
-		nil,
+		secretIDOut{
+			"no-version-id": &secretsmanager.GetSecretValueOutput{},
+		},
 		secretIDErr{
 			"way-too-secret": errors.New("permission denied"),
 		},
@@ -154,6 +156,10 @@ func TestSecretErrors(t *testing.T) {
 		{
 			id:              "non-existent",
 			wantErrContains: "not found",
+		},
+		{
+			id:              "no-version-id",
+			wantErrContains: "version ID",
 		},
 	}
 

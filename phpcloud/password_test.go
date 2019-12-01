@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -173,5 +174,25 @@ func TestPasswordUpdate(t *testing.T) {
 				}
 			})
 		})
+	}
+}
+
+func TestPasswordDebugReason(t *testing.T) {
+	c := NewCrypto()
+
+	req := CheckPasswordRequest{
+		Hash: fmt.Sprintf("%sbad-hash", argon2i),
+	}
+	got := new(CheckPasswordResponse)
+	if err := c.CheckPassword(req, got); err != nil {
+		t.Fatalf("Crypto.CheckPassword(%+v) error %v", req, err)
+	}
+
+	want := &CheckPasswordResponse{
+		Match:       false,
+		DebugReason: argon2.ErrInvalidPrefix.Error(),
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("Crypto.CheckPassword(%+v) diff (-want +got):\n%s", req, diff)
 	}
 }
