@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -10,7 +10,7 @@ go_library(
         "secrets.go",
     ],
     importpath = "github.com/aschlosberg/phpcloud/phpcloud",
-    visibility = ["//visibility:private"],
+    visibility = ["//visibility:public"],
     deps = [
         "//argon2:go_default_library",
         "//phpcloud/proto:go_default_library",
@@ -21,13 +21,6 @@ go_library(
         "@com_github_spiral_goridge//:go_default_library",
         "@org_golang_x_crypto//bcrypt:go_default_library",
     ],
-)
-
-go_binary(
-    name = "phpcloud",
-    embed = [":go_default_library"],
-    static = "on",
-    visibility = ["//visibility:public"],
 )
 
 go_test(

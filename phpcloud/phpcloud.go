@@ -1,53 +1,22 @@
-// The phpcloud binary is a daemon that provides a "Crypto" RPC service. It does
-// not daemonise itself, but relies on an external mechanism.
-package main
+// Package phpcloud provides net/rpc services to offload functionality from PHP
+// to Go via the spiral/goridge codec. It has an accompanying PHP client library
+// and Docker image.
+package phpcloud
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
-	"os/signal"
 	"reflect"
-	"syscall"
 
 	log "github.com/golang/glog"
 	"github.com/spiral/goridge"
 )
 
-func main() {
-	sock := flag.String("socket", "/tmp/phpcloud.sock", "Unix socket on which to listen.")
-	healthPort := flag.Int("health_port", 1810, "Port on which to start an HTTP server responding to health checks.")
-	flag.Parse()
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		log.Infof("Shutting down on signal: %s", <-sig)
-		cancel()
-	}()
-
-	if err := register(NewCrypto(), NewAWS(nil)); err != nil {
-		log.Exitf("Register RPC services: %v", err)
-	}
-
-	ready := make(chan struct{})
-	go func() {
-		<-ready
-		serveHealthCheck(fmt.Sprintf("127.0.0.1:%d", *healthPort))
-	}()
-
-	if err := serve(ctx, *sock, ready); err != nil {
-		log.Exit(err)
-	}
-}
-
-func register(c *Crypto, a *AWS) error {
+// Register registers instances of RPC services.
+func Register(c *Crypto, a *AWS) error {
 	return registerWithPrefix("", c, a)
 }
 
@@ -72,14 +41,19 @@ func registerWithPrefix(prefix string, c *Crypto, a *AWS) error {
 	return nil
 }
 
-// serve listens on sock, closing ready (if non-nil) once listening, and then
-// accepts net/rpc connections with the goridge Codec.
-func serve(ctx context.Context, sock string, ready chan struct{}) error {
+// ServeSocketPermission is the POSIX permission to which Serve sets its socket.
+const ServeSocketPermission = 0770
+
+// Serve listens on sock, closing ready (if non-nil) once listening, and then
+// accepts net/rpc connections with the goridge Codec. It sets ownership of sock
+// to the current uid:gid and permissions to ServeSocketPermission. Serve is
+// blocking, and respects context cancellation.
+func Serve(ctx context.Context, sock string, ready chan struct{}) error {
 	lis, err := net.Listen("unix", sock)
 	if err != nil {
 		return fmt.Errorf("listen on socket: %v", err)
 	}
-	if err := os.Chmod(sock, 0770); err != nil {
+	if err := os.Chmod(sock, ServeSocketPermission); err != nil {
 		return fmt.Errorf("chmod socket to 770: %v", err)
 	}
 	if err := os.Chown(sock, os.Getuid(), os.Getgid()); err != nil {
@@ -121,16 +95,6 @@ AcceptLoop:
 
 	<-done
 	return nil
-}
-
-func serveHealthCheck(addr string) {
-	const path = "/health"
-	log.Infof("Starting health server on http://%s%s", addr, path)
-
-	http.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte("Ok"))
-	})
-	http.ListenAndServe(addr, nil)
 }
 
 // Error implements the error interface.

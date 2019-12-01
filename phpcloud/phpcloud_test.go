@@ -1,4 +1,4 @@
-package main
+package phpcloud
 
 import (
 	"context"
@@ -89,7 +89,7 @@ func testClient(ctx context.Context, t *testing.T, c *Crypto, a *AWS) (_ *rpcCli
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := serve(ctx, sock, ready); err != nil {
+		if err := Serve(ctx, sock, ready); err != nil {
 			t.Fatalf("listen() got err %v; want nil err", err)
 		}
 	}()

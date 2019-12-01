@@ -62,5 +62,5 @@ RUN chmod 750 /run/phpcloud
 ##### supervisord #####
 
 RUN apk add supervisor
-COPY docker/config/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+COPY docker/config/supervisord.conf /etc/supervisord.conf
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
