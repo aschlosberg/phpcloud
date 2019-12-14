@@ -108,6 +108,8 @@ const (
 	ErrKeyBase64
 	ErrNotDecrypted
 	ErrBlockModeUnsupported
+	ErrDetectCiphertextMode
+	ErrAllowedDecryptMode
 )
 
 func (e Error) Error() string {
@@ -122,6 +124,10 @@ func (e Error) Error() string {
 		return "unable to decrypt"
 	case ErrBlockModeUnsupported:
 		return "crypto block mode not supported"
+	case ErrDetectCiphertextMode:
+		return "detect ciphertext mode"
+	case ErrAllowedDecryptMode:
+		return "disallowed ciphertext mode when decrypting"
 	}
 	return "unknown error"
 }

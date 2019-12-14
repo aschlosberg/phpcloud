@@ -1,6 +1,7 @@
 package phpcloud
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -30,11 +31,17 @@ const (
 	Passphrase KeySourceType = `passphrase:`
 )
 
+// string returns t as a string. It allows for centralised modification of type
+// conversion.
+func (t KeySourceType) string() string {
+	return string(t)
+}
+
 func (c *Crypto) key(src string) ([]byte, error) {
 	var key []byte
 	var raw bool
 
-	for _, prefix := range []string{string(RawKey), string(Passphrase)} {
+	for _, prefix := range []string{RawKey.string(), Passphrase.string()} {
 		if !strings.HasPrefix(src, prefix) {
 			continue
 		}
@@ -59,14 +66,14 @@ func (c *Crypto) key(src string) ([]byte, error) {
 
 // EncryptRequest is the request argument for Crypto.Encrypt*.
 type EncryptRequest struct {
-	DataToEncrypt             string
-	AuthenticatedNotEncrypted string
+	DataToEncrypt             []byte
+	AuthenticatedNotEncrypted []byte
 	KeySource                 string
 }
 
 // EncryptResponse is the response argument for Crypto.Encrypt*.
 type EncryptResponse struct {
-	EncryptedData string
+	EncryptedData []byte
 }
 
 // EncryptAESGCM encrypts the request with AES-GCM.
@@ -89,20 +96,42 @@ func (c *Crypto) EncryptAESGCM(req EncryptRequest, resp *EncryptResponse) error 
 	buf, err := proto.Marshal(&pb.Ciphertext{
 		Mode:              pb.Ciphertext_AESGCM,
 		Nonce:             nonce,
-		Sealed:            aead.Seal(nil, nonce, []byte(req.DataToEncrypt), []byte(req.AuthenticatedNotEncrypted)),
-		AuthenticatedData: []byte(req.AuthenticatedNotEncrypted),
+		Sealed:            aead.Seal(nil, nonce, req.DataToEncrypt, req.AuthenticatedNotEncrypted),
+		AuthenticatedData: req.AuthenticatedNotEncrypted,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal ciphertext proto: %v", err)
 	}
-	resp.EncryptedData = base64.StdEncoding.EncodeToString(buf)
+
+	// Decryption needs to handle data from this function, as well as AESECB
+	// from MariaDB's AES_ENCRYPT(). However, the latter will be raw binary that
+	// could properly unmarshal as a ciphertext proto with AESGCM as the Mode
+	// (it happened during testing)! To avoid this, ensure that our ciphertext
+	// never has a length that is a multiple of the AES block size (16 bytes).
+
+	// The final byte of padding indicates the size of the padding.
+	if len(buf)%aes.BlockSize == aes.BlockSize-1 {
+		buf = append(buf, 0, 2) // len == 16n+1
+	} else {
+		buf = append(buf, 1) // len%16 != 0
+	}
+
+	resp.EncryptedData = buf
 	return nil
 }
 
-func (c *Crypto) aesGCM(key []byte) (cipher.AEAD, error) {
+func (c *Crypto) aes(key []byte) (cipher.Block, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("insantiate AES cipher: %v", err)
+	}
+	return block, nil
+}
+
+func (c *Crypto) aesGCM(key []byte) (cipher.AEAD, error) {
+	block, err := c.aes(key)
+	if err != nil {
+		return nil, err
 	}
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
@@ -113,17 +142,22 @@ func (c *Crypto) aesGCM(key []byte) (cipher.AEAD, error) {
 
 // DecryptRequest is the request argument for Crypto.Decrypt.
 type DecryptRequest struct {
-	EncryptedData   string
+	EncryptedData   []byte
 	KeySources      []string
 	RotateKeySource string
+
+	// AllowedModes specifies the Modes that are allowed, and can be used to
+	// disable ECB fallback, which allows for circumventing GCM authentication
+	// checks.
+	AllowedModes map[pb.Ciphertext_Mode]bool
 }
 
 // DecryptResponse is the response argument for Crypto.Decrypt.
 type DecryptResponse struct {
-	DecryptedData     string
-	AuthenticatedData string
+	DecryptedData     []byte
+	AuthenticatedData []byte
 
-	ReEncryptedData string
+	ReEncryptedData []byte
 }
 
 // Decrypt decrypts the request.
@@ -132,13 +166,30 @@ func (c *Crypto) Decrypt(req DecryptRequest, resp *DecryptResponse) error {
 		req.KeySources = append(req.KeySources, req.RotateKeySource)
 	}
 
-	buf, err := base64.StdEncoding.DecodeString(req.EncryptedData)
-	if err != nil {
-		return fmt.Errorf("base64-decode encrypted data: %v", err)
-	}
+	// See the end of c.Encrypt() for an explanation of why and how it pads
+	// the ciphertext. TL;DR it will never be a multiple of aes.Blocksize, and
+	// the final byte indicates the length of padding to strip.
 	ciphertext := new(pb.Ciphertext)
-	if err := proto.Unmarshal(buf, ciphertext); err != nil {
-		return fmt.Errorf("unmarshal ciphertext proto: %v", err)
+	if len(req.EncryptedData)%aes.BlockSize == 0 {
+		ciphertext = &pb.Ciphertext{
+			Mode:   pb.Ciphertext_AESECB,
+			Sealed: req.EncryptedData,
+		}
+	} else {
+		n := len(req.EncryptedData)
+		pad := int(req.EncryptedData[n-1])
+		if pad > n {
+			return ErrDetectCiphertextMode
+		}
+
+		buf := req.EncryptedData[:n-pad]
+		if err := proto.Unmarshal(buf, ciphertext); err != nil {
+			return fmt.Errorf("unmarshal ciphertext proto: %v", err)
+		}
+	}
+
+	if req.AllowedModes != nil && !req.AllowedModes[ciphertext.Mode] {
+		return ErrAllowedDecryptMode
 	}
 
 	var usedSrc string
@@ -156,22 +207,35 @@ func (c *Crypto) Decrypt(req DecryptRequest, resp *DecryptResponse) error {
 			continue
 		}
 		usedSrc = src
-		resp.DecryptedData = string(plaintext)
-		resp.AuthenticatedData = string(additional)
+		resp.DecryptedData = plaintext
+		resp.AuthenticatedData = additional
 		break
 	}
 
 	if usedSrc == "" {
 		return ErrNotDecrypted
 	}
-	if usedSrc == req.RotateKeySource || req.RotateKeySource == "" {
+
+	keyOK := req.RotateKeySource == "" || usedSrc == req.RotateKeySource
+	algoOK := ciphertext.Mode == pb.Ciphertext_AESGCM
+	if keyOK && algoOK {
 		return nil
+	}
+
+	// We need to reencrypt because the key needs rotation, and/or the algorithm
+	// needs upgrading. However, of the three possible permutations, only one
+	// allows for key reuse.
+	var reEncKey string
+	if keyOK {
+		reEncKey = usedSrc
+	} else {
+		reEncKey = req.RotateKeySource
 	}
 
 	encReq := EncryptRequest{
 		DataToEncrypt:             resp.DecryptedData,
 		AuthenticatedNotEncrypted: resp.AuthenticatedData,
-		KeySource:                 req.RotateKeySource,
+		KeySource:                 reEncKey,
 	}
 	encResp := new(EncryptResponse)
 	if err := c.EncryptAESGCM(encReq, encResp); err != nil {
@@ -209,5 +273,20 @@ func (c *Crypto) decryptAESGCM(key []byte, ct *pb.Ciphertext) ([]byte, []byte, e
 }
 
 func (c *Crypto) decryptAESECB(key []byte, ct *pb.Ciphertext) ([]byte, error) {
-	return nil, ErrUnimplemented
+	block, err := c.aes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintext := make([]byte, 0, len(ct.Sealed))
+
+	dst := make([]byte, aes.BlockSize)
+	for i, max := 0, len(ct.Sealed)-aes.BlockSize; i <= max; i += aes.BlockSize {
+		block.Decrypt(dst, ct.Sealed[i:i+aes.BlockSize])
+		plaintext = append(plaintext, dst...)
+	}
+	// TODO replace the TrimRight with the correct padding schema for MariaDB's
+	// AES_ENCRYPT. Also enable (remove t.Skip) from the fuzz test. Also update
+	// tests to reflect the schema.
+	return bytes.TrimRight(plaintext, "\x00"), nil
 }
