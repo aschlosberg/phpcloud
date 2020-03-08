@@ -35,6 +35,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//argon2:go_default_library",
+        "//phpcloud/proto:go_default_library",
         "@com_github_aws_aws_sdk_go//aws:go_default_library",
         "@com_github_aws_aws_sdk_go//service/secretsmanager:go_default_library",
         "@com_github_aws_aws_sdk_go//service/secretsmanager/secretsmanageriface:go_default_library",
